@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Separador de Etiquetas — NatCare</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <header class="mobile-header">
+        <button class="menu-toggle" id="menu-toggle">☰</button>
+        <span class="header-sub">Separador</span>
+        <div style="width: 24px;"></div> <!-- Spacer -->
+    </header>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <img class="sidebar-logo"
+                    src="natcare-logo.jpg"
+                    alt="NatCare Logo">
+            </div>
+            <nav class="nav-menu">
+                <div class="nav-item active">
+                    <a href="index.html">
+                        <svg class="nav-icon" viewBox="0 0 24 24" stroke="currentColor">
+                            <path d="M7 7l5 5-5 5M13 7l5 5-5 5" />
+                        </svg>
+                        Separador de Etiquetas
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a href="generador.html">
+                        <svg class="nav-icon" viewBox="0 0 24 24" stroke="currentColor">
+                            <path d="M12 5v14M5 12h14" />
+                        </svg>
+                        Generador de Etiquetas
+                    </a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="wrapper">
+
+        <!-- Top bar -->
+        <div class="top-bar">
+            <span></span><span></span><span></span>
+        </div>
+
+        <!-- Header -->
+        <div class="header">
+            <h1>Separador de Etiquetas</h1>
+            <p class="header-desc" style="margin-top:4px;">Divide tus etiquetas ZPL en archivos individuales</p>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Main card -->
+        <div class="card">
+            <div class="section-label">Archivo ZPL</div>
+
+            <div class="drop-zone" id="dropZone">
+                <input type="file" id="fileInput" accept=".txt,.zpl,text/plain">
+                <div class="drop-icon" id="dropIcon">⬆</div>
+                <div class="drop-text" id="dropText">Arrastra tu archivo aquí<br>o haz clic para seleccionar</div>
+            </div>
+
+            <div class="file-path" id="filePath"></div>
+
+            <div class="inner-divider"></div>
+
+            <div class="section-label">Carpeta de salida</div>
+            <div class="output-row">
+                <div class="output-text" id="outputText">Los archivos se descargarán en un ZIP</div>
+            </div>
+        </div>
+
+        <!-- Split button -->
+        <div class="btn-wrap">
+            <button class="btn-split" id="splitBtn" disabled onclick="startSplit()">
+                ✦ &nbsp;Dividir etiquetas&nbsp; ✦
+            </button>
+        </div>
+
+        <!-- Progress -->
+        <div class="progress-wrap">
+            <div class="progress-track">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-label" id="progressLabel"></div>
+        </div>
+
+        <!-- Results -->
+        <div class="results-card">
+            <div class="results-header">
+                <div class="results-title">Archivos generados</div>
+                <div class="results-count" id="resultsCount"></div>
+            </div>
+            <div class="results-body" id="resultsBody">
+                <div class="placeholder-msg">Los archivos aparecerán aquí…</div>
+            </div>
+        </div>
+
+        <div class="download-notice">
+            <strong>🌐 Versión web:</strong> los archivos generados se descargarán automáticamente<br>
+            como un archivo <strong>ZIP</strong> con todas las etiquetas individuales.
+        </div>
+
+    </div>
+
+    <!-- JSZip for creating zip files in browser -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <script>
+        // ─── ZPL LOGIC (ported from Python) ───────────────────────────────────────────
+        const ZPL_REPLACEMENTS = {
+            "_C3_B1": "ñ", "_C3_91": "Ñ",
+            "_C3_A1": "á", "_C3_81": "Á",
+            "_C3_A9": "é", "_C3_89": "É",
+            "_C3_AD": "í", "_C3_8D": "Í",
+            "_C3_B3": "ó", "_C3_93": "Ó",
+            "_C3_BA": "ú", "_C3_9A": "Ú",
+            "_C3_BC": "ü", "_C3_9C": "Ü",
+            "_C2_BF": "¿", "_C2_A1": "¡",
+        };
+
+        function decodeZplText(text) {
+            for (const [code, char] of Object.entries(ZPL_REPLACEMENTS)) {
+                text = text.split(code).join(char);
+            }
+            return text;
+        }
+
+        function sanitizeFilename(name) {
+            name = decodeZplText(name);
+            name = name.replace(/[<>:"/\\|?*\x00-\x1f]/g, " ");
+            name = name.trim().replace(/\.+$/, "");
+            name = name.replace(/\s+/g, " ");
+            return name.substring(0, 120) || "etiqueta_sin_nombre";
+        }
+
+        function extractLabelName(block) {
+            const m115 = block.match(/\^FO22,115\^A0N,\d+,\d+\^FB\d+,\d+,\d+,[LRC]\^FH\^FD(.+?)\^FS/);
+            const m150 = block.match(/\^FO22,150\^A0N,\d+,\d+\^FB\d+,\d+,\d+,[LRC]\^FH\^FD(.+?)\^FS/);
+
+            const part1 = m115 && m115[1].trim() ? sanitizeFilename(m115[1].trim()) : "";
+            const part2 = m150 && m150[1].trim() ? sanitizeFilename(m150[1].trim()) : "";
+
+            let name;
+            if (part1 && part2) name = `${part1} - ${part2}`;
+            else if (part1) name = part1;
+            else if (part2) name = part2;
+            else {
+                const fds = [...block.matchAll(/\^FD([^\^]+)\^FS/g)];
+                for (const m of fds) {
+                    if (m[1].trim()) return sanitizeFilename(m[1].trim());
+                }
+                name = "etiqueta_sin_nombre";
+            }
+            return name.substring(0, 180);
+        }
+
+        function splitZpl(content) {
+            const blocks = [...content.matchAll(/\^XA.*?\^XZ/gs)].map(m => m[0]);
+            if (!blocks.length) throw new Error("No se encontraron etiquetas ZPL en el archivo.");
+
+            const nameCount = {};
+            const results = [];
+
+            for (const block of blocks) {
+                const baseName = extractLabelName(block);
+                let fileName;
+                if (nameCount[baseName] !== undefined) {
+                    nameCount[baseName]++;
+                    fileName = `${baseName} (${nameCount[baseName]}).txt`;
+                } else {
+                    nameCount[baseName] = 1;
+                    fileName = `${baseName}.txt`;
+                }
+                results.push({ fileName, content: block + "\n" });
+            }
+            return results;
+        }
+
+        // ─── UI STATE ─────────────────────────────────────────────────────────────────
+        let selectedFile = null;
+
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const dropIcon = document.getElementById('dropIcon');
+        const dropText = document.getElementById('dropText');
+        const filePath = document.getElementById('filePath');
+        const splitBtn = document.getElementById('splitBtn');
+        const progressFill = document.getElementById('progressFill');
+        const progressLabel = document.getElementById('progressLabel');
+        const resultsBody = document.getElementById('resultsBody');
+        const resultsCount = document.getElementById('resultsCount');
+
+        // File selection via input
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files[0]) setFile(fileInput.files[0]);
+        });
+
+        // Drag & drop
+        dropZone.addEventListener('dragover', e => {
+            e.preventDefault();
+            dropZone.classList.add('hover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('hover'));
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('hover');
+            const f = e.dataTransfer.files[0];
+            if (f) setFile(f);
+        });
+
+        function setFile(f) {
+            selectedFile = f;
+            dropZone.classList.add('selected');
+            dropIcon.textContent = '✓';
+            dropText.textContent = f.name;
+            filePath.textContent = f.name + (f.size ? ` · ${(f.size / 1024).toFixed(1)} KB` : '');
+            splitBtn.disabled = false;
+            setProgress(0, '');
+            resultsBody.innerHTML = '<div class="placeholder-msg">Listo para procesar…</div>';
+            resultsCount.textContent = '';
+        }
+
+        function setProgress(pct, label, isSuccess = false) {
+            progressFill.style.width = pct + '%';
+            progressLabel.textContent = label;
+            progressLabel.className = 'progress-label' + (isSuccess ? ' success' : '');
+        }
+
+        async function startSplit() {
+            if (!selectedFile) return;
+
+            splitBtn.disabled = true;
+            splitBtn.textContent = '⏳ Procesando…';
+            setProgress(0, 'Leyendo archivo…');
+            resultsBody.innerHTML = '<div class="placeholder-msg">Procesando…</div>';
+            resultsCount.textContent = 'procesando…';
+
+            try {
+                const content = await readFile(selectedFile);
+                setProgress(20, 'Separando etiquetas…');
+
+                // Small delay for UI to breathe
+                await new Promise(r => setTimeout(r, 50));
+
+                const results = splitZpl(content);
+                const total = results.length;
+
+                setProgress(50, `Creando ${total} archivos…`);
+                await new Promise(r => setTimeout(r, 50));
+
+                // Build ZIP
+                const zip = new JSZip();
+                const folder = zip.folder("etiquetas_separadas");
+
+                for (let i = 0; i < results.length; i++) {
+                    folder.file(results[i].fileName, results[i].content);
+                    const pct = 50 + Math.round((i + 1) / total * 40);
+                    setProgress(pct, `${i + 1} de ${total} etiquetas…`);
+                    if (i % 20 === 0) await new Promise(r => setTimeout(r, 0)); // yield
+                }
+
+                setProgress(95, 'Generando ZIP…');
+                await new Promise(r => setTimeout(r, 30));
+
+                const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+                setProgress(100, '✓ Completado', true);
+
+                // Trigger download
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const baseName = selectedFile.name.replace(/\.[^.]+$/, '');
+                a.download = `${baseName}_etiquetas.zip`;
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+                // Populate results list
+                resultsBody.innerHTML = '';
+                for (const r of results) {
+                    const div = document.createElement('div');
+                    div.className = 'result-item';
+                    div.innerHTML = `<span class="result-check">✓</span><span>${r.fileName}</span>`;
+                    resultsBody.appendChild(div);
+                }
+                resultsCount.textContent = `${total} archivo${total !== 1 ? 's' : ''}`;
+
+            } catch (err) {
+                setProgress(0, '');
+                resultsBody.innerHTML = `<div class="error-msg">✗ ${err.message}</div>`;
+                resultsCount.textContent = '';
+            } finally {
+                splitBtn.disabled = false;
+                splitBtn.innerHTML = '✦ &nbsp;Dividir etiquetas&nbsp; ✦';
+            }
+        }
+
+        function readFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+                reader.readAsText(file, 'utf-8');
+            });
+        }
+    </script>
+
+    <script>
+        const menuToggle = document.getElementById('menu-toggle');
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+
+        function toggleMenu() {
+            if (sidebar) sidebar.classList.toggle('open');
+            if (overlay) overlay.classList.toggle('open');
+        }
+
+        if (menuToggle) menuToggle.addEventListener('click', toggleMenu);
+        if (overlay) overlay.addEventListener('click', toggleMenu);
+    </script>
+            </div> <!-- .wrapper -->
+        </main> <!-- .main-content -->
+    </div> <!-- .app-container -->
+</body>
+
+</html>

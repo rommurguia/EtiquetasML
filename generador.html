@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Etiquetas — NatCare</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* ── GENERADOR-SPECIFIC STYLES ── */
+
+        .gen-wrapper {
+            max-width: 900px;
+            width: 100%;
+        }
+
+        /* Folder badge */
+        .folder-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--card2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 6px 14px;
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            max-width: 300px;
+        }
+
+        .folder-badge:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: var(--accent-glow);
+        }
+
+        .folder-badge .folder-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .folder-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--accent);
+            flex-shrink: 0;
+        }
+
+        .folder-dot.unset {
+            background: var(--error);
+        }
+
+        /* Toolbar */
+        .gen-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .gen-toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .count-badge {
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            color: var(--text-dim);
+            background: var(--card2);
+            border: 1px solid var(--border-soft);
+            border-radius: 20px;
+            padding: 3px 12px;
+        }
+
+        .gen-toolbar-right {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Buttons */
+        .btn-gen {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .btn-gen-ghost {
+            background: var(--card);
+            border-color: var(--border);
+            color: var(--text-muted);
+        }
+
+        .btn-gen-ghost:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: var(--accent-glow);
+        }
+
+        .btn-gen-primary {
+            background: var(--accent);
+            color: #fff;
+            font-weight: 600;
+            box-shadow: 0 4px 16px rgba(91, 154, 75, 0.25);
+        }
+
+        .btn-gen-primary:hover:not(:disabled) {
+            background: #4A8A3C;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 24px rgba(91, 154, 75, 0.35);
+        }
+
+        .btn-gen-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-gen-danger {
+            background: transparent;
+            border-color: transparent;
+            color: var(--text-dim);
+            padding: 4px 6px;
+            border-radius: 6px;
+        }
+
+        .btn-gen-danger:hover {
+            color: var(--error);
+            background: rgba(217, 79, 79, 0.08);
+        }
+
+        /* Labels table */
+        .labels-container {
+            background: var(--card);
+            border: 1px solid var(--border-soft);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 2px 20px rgba(91, 154, 75, 0.06);
+        }
+
+        .table-header {
+            display: grid;
+            grid-template-columns: 32px 2fr 1.2fr 2.5fr 1.4fr 70px 36px;
+            gap: 0;
+            background: var(--card2);
+            border-bottom: 1px solid var(--border-soft);
+            padding: 0 10px;
+        }
+
+        .th {
+            padding: 10px 6px;
+            font-family: 'DM Mono', monospace;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .label-row {
+            display: grid;
+            grid-template-columns: 32px 2fr 1.2fr 2.5fr 1.4fr 70px 36px;
+            gap: 0;
+            border-bottom: 1px solid var(--border-soft);
+            padding: 0 10px;
+            align-items: center;
+            transition: background 0.15s ease;
+        }
+
+        .label-row:last-child {
+            border-bottom: none;
+        }
+
+        .label-row:hover {
+            background: var(--accent-glow);
+        }
+
+        .row-num {
+            font-family: 'DM Mono', monospace;
+            font-size: 10px;
+            color: var(--text-dim);
+            text-align: center;
+        }
+
+        .cell {
+            padding: 6px 4px;
+        }
+
+        /* Inputs */
+        .gen-input {
+            width: 100%;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            padding: 6px 8px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 12px;
+            color: var(--text);
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .gen-input:hover {
+            border-color: var(--border);
+            background: var(--card2);
+        }
+
+        .gen-input:focus {
+            border-color: var(--accent);
+            background: var(--card2);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+        }
+
+        .gen-input.mono {
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+        }
+
+        .gen-input[type="number"] {
+            text-align: center;
+        }
+
+        .gen-input::placeholder {
+            color: var(--text-dim);
+        }
+
+        /* Add row */
+        .add-row {
+            padding: 10px 14px;
+            border-top: 1px solid var(--border-soft);
+            background: var(--card2);
+        }
+
+        .add-row .btn-gen-ghost {
+            width: 100%;
+            justify-content: center;
+            border-style: dashed;
+        }
+
+        /* Status bar */
+        .gen-statusbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 14px;
+            padding: 10px 16px;
+            background: var(--card);
+            border: 1px solid var(--border-soft);
+            border-radius: 12px;
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            color: var(--text-dim);
+            box-shadow: 0 2px 20px rgba(91, 154, 75, 0.06);
+        }
+
+        .status-items {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .status-item {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .status-ok {
+            color: var(--success);
+        }
+
+        .status-warn {
+            color: #F59E0B;
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            background: var(--card);
+            border: 1px solid var(--border-soft);
+            border-radius: 12px;
+            padding: 12px 16px;
+            font-size: 12px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 8px 32px rgba(30, 41, 59, 0.12);
+            animation: toastIn 0.25s ease;
+            max-width: 340px;
+        }
+
+        .toast.success {
+            border-color: var(--accent);
+        }
+
+        .toast.error {
+            border-color: var(--error);
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(30, 41, 59, 0.4);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(3px);
+        }
+
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--card);
+            border: 1px solid var(--border-soft);
+            border-radius: 18px;
+            padding: 28px;
+            width: 400px;
+            box-shadow: 0 24px 64px rgba(30, 41, 59, 0.2);
+        }
+
+        .modal h3 {
+            font-family: 'DM Serif Display', serif;
+            font-size: 18px;
+            font-weight: 400;
+            margin-bottom: 10px;
+            color: var(--text);
+        }
+
+        .modal p {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+
+        .modal p code {
+            background: var(--card2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: 'DM Mono', monospace;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 48px 20px;
+            color: var(--text-dim);
+        }
+
+        .empty-state .icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .empty-state p {
+            font-size: 13px;
+            font-weight: 300;
+        }
+
+        /* Header actions (folder) */
+        .gen-header-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .gen-header-actions .header-sub {
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <header class="mobile-header">
+        <button class="menu-toggle" id="menu-toggle">☰</button>
+        <span class="header-sub">Generador</span>
+        <div style="width: 24px;"></div> <!-- Spacer -->
+    </header>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <img class="sidebar-logo"
+                    src="natcare-logo.jpg"
+                    alt="NatCare Logo">
+            </div>
+            <nav class="nav-menu">
+                <div class="nav-item">
+                    <a href="index.html">
+                        <svg class="nav-icon" viewBox="0 0 24 24" stroke="currentColor">
+                            <path d="M7 7l5 5-5 5M13 7l5 5-5 5" />
+                        </svg>
+                        Separador de Etiquetas
+                    </a>
+                </div>
+                <div class="nav-item active">
+                    <a href="generador.html">
+                        <svg class="nav-icon" viewBox="0 0 24 24" stroke="currentColor">
+                            <path d="M12 5v14M5 12h14" />
+                        </svg>
+                        Generador de Etiquetas
+                    </a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="gen-wrapper">
+
+                <!-- Top bar -->
+                <div class="top-bar">
+                    <span></span><span></span><span></span>
+                </div>
+
+                <!-- Header -->
+                <div class="header">
+                    <h1>Generador de Etiquetas</h1>
+                    <p class="header-sub">Crea etiquetas ZPL personalizadas para tus productos NatCare</p>
+                </div>
+
+                <!-- Folder selection -->
+                <div class="gen-header-actions">
+                    <div></div>
+                    <div class="folder-badge" onclick="changeFolder()" title="Clic para cambiar carpeta de destino">
+                        <div class="folder-dot" id="folderDot"></div>
+                        📁
+                        <span class="folder-name" id="folderDisplay">Sin carpeta seleccionada</span>
+                        <span style="color:var(--text-dim)">✏️</span>
+                    </div>
+                </div>
+
+                <!-- Toolbar -->
+                <div class="gen-toolbar">
+                    <div class="gen-toolbar-left">
+                        <div class="section-label" style="margin-bottom:0;">Etiquetas</div>
+                        <div class="count-badge" id="countBadge">0 etiquetas</div>
+                    </div>
+                    <div class="gen-toolbar-right">
+                        <button class="btn-gen btn-gen-ghost" onclick="addLabel()">+ Agregar etiqueta</button>
+                        <button class="btn-gen btn-gen-primary" id="genBtn" onclick="generateFiles()" disabled>⬇ Generar archivos</button>
+                    </div>
+                </div>
+
+                <!-- Labels table -->
+                <div class="labels-container">
+                    <div class="table-header">
+                        <div class="th" style="text-align:center">#</div>
+                        <div class="th">Nombre del producto</div>
+                        <div class="th">Código barras</div>
+                        <div class="th">Descripción</div>
+                        <div class="th">SKU</div>
+                        <div class="th" style="text-align:center">Copias</div>
+                        <div class="th"></div>
+                    </div>
+                    <div id="labelsBody">
+                        <div class="empty-state">
+                            <div class="icon">📋</div>
+                            <p>Agrega etiquetas con el botón de arriba</p>
+                        </div>
+                    </div>
+                    <div class="add-row">
+                        <button class="btn-gen btn-gen-ghost" onclick="addLabel()">
+                            + Nueva etiqueta
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status bar -->
+                <div class="gen-statusbar">
+                    <div class="status-items">
+                        <div class="status-item" id="statusLabels">
+                            <span>—</span>
+                        </div>
+                    </div>
+                    <div style="font-size:10px;color:var(--text-dim)">
+                        Usa la API de File System Access (Chrome/Edge)
+                    </div>
+                </div>
+
+            </div> <!-- .gen-wrapper -->
+        </main> <!-- .main-content -->
+    </div> <!-- .app-container -->
+
+    <!-- Toast container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Folder modal -->
+    <div class="modal-overlay" id="folderModal">
+        <div class="modal">
+            <h3>📁 Carpeta de destino</h3>
+            <p>Selecciona la carpeta donde se guardarán los archivos <code>.txt</code> de las etiquetas ZPL.</p>
+            <div class="modal-actions">
+                <button class="btn-gen btn-gen-ghost" onclick="closeFolderModal()">Cancelar</button>
+                <button class="btn-gen btn-gen-primary" onclick="pickFolder()">Seleccionar carpeta…</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ─── MOBILE MENU ───────────────────────────────────
+        const menuToggle = document.getElementById('menu-toggle');
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+
+        function toggleMenu() {
+            if (sidebar) sidebar.classList.toggle('open');
+            if (overlay) overlay.classList.toggle('open');
+        }
+
+        if (menuToggle) menuToggle.addEventListener('click', toggleMenu);
+        if (overlay) overlay.addEventListener('click', toggleMenu);
+
+        // ─── STATE ───────────────────────────────────────────
+        let labels = [];
+        let dirHandle = null;
+        let labelCounter = 0;
+
+        // ─── INIT ────────────────────────────────────────────
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedName = localStorage.getItem('zpl_folder_name');
+            if (savedName) {
+                setFolderDisplay(savedName, false);
+            }
+            updateUI();
+        });
+
+        // ─── FOLDER ──────────────────────────────────────────
+        function changeFolder() {
+            document.getElementById('folderModal').classList.add('open');
+        }
+
+        function closeFolderModal() {
+            document.getElementById('folderModal').classList.remove('open');
+        }
+
+        async function pickFolder() {
+            try {
+                dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                localStorage.setItem('zpl_folder_name', dirHandle.name);
+                setFolderDisplay(dirHandle.name, true);
+                closeFolderModal();
+                toast('✅ Carpeta guardada: ' + dirHandle.name, 'success');
+            } catch (e) {
+                if (e.name !== 'AbortError') toast('Error al seleccionar carpeta', 'error');
+            }
+        }
+
+        function setFolderDisplay(name, isActive) {
+            document.getElementById('folderDisplay').textContent = name;
+            const dot = document.getElementById('folderDot');
+            dot.className = 'folder-dot' + (isActive ? '' : ' unset');
+        }
+
+        // ─── LABELS ──────────────────────────────────────────
+        function addLabel() {
+            labelCounter++;
+            const id = 'lbl_' + Date.now();
+            labels.push({ id, nombre: '', barcode: '', descripcion: '', sku: '', copias: 1 });
+            renderLabels();
+            updateUI();
+            // Focus first input of new row
+            setTimeout(() => {
+                const inputs = document.querySelectorAll(`[data-id="${id}"]`);
+                if (inputs[0]) inputs[0].focus();
+            }, 30);
+        }
+
+        function removeLabel(id) {
+            labels = labels.filter(l => l.id !== id);
+            renderLabels();
+            updateUI();
+        }
+
+        function updateField(id, field, value) {
+            const lbl = labels.find(l => l.id === id);
+            if (lbl) lbl[field] = value;
+            updateUI();
+        }
+
+        function renderLabels() {
+            const body = document.getElementById('labelsBody');
+            if (labels.length === 0) {
+                body.innerHTML = `<div class="empty-state"><div class="icon">📋</div><p>Agrega etiquetas con el botón de arriba</p></div>`;
+                return;
+            }
+            body.innerHTML = labels.map((l, i) => `
+                <div class="label-row" id="row_${l.id}">
+                    <div class="cell row-num">${i + 1}</div>
+                    <div class="cell">
+                        <input type="text" class="gen-input" placeholder="Nombre del producto" value="${esc(l.nombre)}"
+                            data-id="${l.id}"
+                            oninput="updateField('${l.id}','nombre',this.value)"
+                            title="Nombre del producto (será el nombre del archivo)">
+                    </div>
+                    <div class="cell">
+                        <input type="text" class="gen-input mono" placeholder="PFRK42793" value="${esc(l.barcode)}"
+                            oninput="updateField('${l.id}','barcode',this.value)"
+                            title="Código de barras">
+                    </div>
+                    <div class="cell">
+                        <input type="text" class="gen-input" placeholder="Descripción del producto" value="${esc(l.descripcion)}"
+                            oninput="updateField('${l.id}','descripcion',this.value)"
+                            title="Descripción del producto">
+                    </div>
+                    <div class="cell">
+                        <input type="text" class="gen-input mono" placeholder="750611..." value="${esc(l.sku)}"
+                            oninput="updateField('${l.id}','sku',this.value)"
+                            title="SKU / código de producto">
+                    </div>
+                    <div class="cell" style="text-align:center">
+                        <input type="number" class="gen-input mono" min="1" max="9999" value="${l.copias}"
+                            oninput="updateField('${l.id}','copias',parseInt(this.value)||1)"
+                            style="width:56px"
+                            title="Número de copias">
+                    </div>
+                    <div class="cell" style="text-align:center">
+                        <button class="btn-gen btn-gen-danger" onclick="removeLabel('${l.id}')" title="Eliminar">✕</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateUI() {
+            const total = labels.length;
+            const valid = labels.filter(l => l.nombre.trim() && l.barcode.trim()).length;
+            document.getElementById('countBadge').textContent = total === 0 ? '0 etiquetas' : `${total} etiqueta${total > 1 ? 's' : ''}`;
+            document.getElementById('genBtn').disabled = valid === 0;
+            const status = document.getElementById('statusLabels');
+            if (total === 0) {
+                status.innerHTML = `<span>—</span>`;
+            } else {
+                const incomplete = total - valid;
+                status.innerHTML = `
+                    <span class="status-ok">✓ ${valid} completa${valid !== 1 ? 's' : ''}</span>
+                    ${incomplete > 0 ? `<span class="status-warn">⚠ ${incomplete} incompleta${incomplete !== 1 ? 's' : ''} (requieren nombre y código)</span>` : ''}
+                `;
+            }
+        }
+
+        // ─── ZPL GENERATOR ───────────────────────────────────
+        function toZplEncoding(str) {
+            let result = '';
+            for (const ch of str) {
+                const code = ch.codePointAt(0);
+                if (code < 128) {
+                    result += ch;
+                } else {
+                    const bytes = new TextEncoder().encode(ch);
+                    for (const b of bytes) {
+                        result += '_' + b.toString(16).toUpperCase().padStart(2, '0');
+                    }
+                }
+            }
+            return result;
+        }
+
+        function buildZPL(label) {
+            const barcode = label.barcode.trim();
+            const nombre = toZplEncoding(label.nombre.trim());
+            const sku = label.sku.trim();
+            const copias = Math.max(1, parseInt(label.copias) || 1);
+            const desc = toZplEncoding(label.descripcion.trim());
+
+            return [
+                '^XA',
+                '^CI28',
+                '^LH0,0',
+                `^FO65,18^BY2^BCN,54,N,N^FD${barcode}^FS`,
+                `^FT150,98^A0N,22,22^FH^FD${barcode}^FS`,
+                `^FT149,98^A0N,22,22^FH^FD${barcode}^FS`,
+                `^FO22,115^A0N,18,18^FB380,2,0,L^FH^FD${nombre}^FS`,
+                `^FO22,150^A0N,18,18^FB380,1,0,L^FH^FD${desc}^FS`,
+                `^FO21,150^A0N,18,18^FB380,1,0,L^FH^FD^FS`,
+                `^FO22,170^A0N,18,18^FH^FDSKU: ${sku}^FS`,
+                `^FO22,170^A0N,18,18^FH^FD^FS`,
+                `^PQ${copias},0,1,Y^XZ`
+            ].join('\n');
+        }
+
+        // ─── GENERATE FILES ───────────────────────────────────
+        async function generateFiles() {
+            const valid = labels.filter(l => l.nombre.trim() && l.barcode.trim());
+            if (valid.length === 0) return;
+
+            if (!dirHandle) {
+                try {
+                    dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                    localStorage.setItem('zpl_folder_name', dirHandle.name);
+                    setFolderDisplay(dirHandle.name, true);
+                } catch (e) {
+                    if (e.name === 'AbortError') return;
+                    toast('Error al seleccionar carpeta', 'error');
+                    return;
+                }
+            }
+
+            let saved = 0;
+            let errors = 0;
+
+            for (const label of valid) {
+                try {
+                    const filename = sanitizeFilename(label.nombre.trim()) + '.txt';
+                    const zpl = buildZPL(label);
+                    const fh = await dirHandle.getFileHandle(filename, { create: true });
+                    const writable = await fh.createWritable();
+                    await writable.write(zpl);
+                    await writable.close();
+                    saved++;
+                } catch (e) {
+                    console.error(e);
+                    errors++;
+                }
+            }
+
+            if (saved > 0) toast(`✅ ${saved} archivo${saved > 1 ? 's' : ''} guardado${saved > 1 ? 's' : ''} en "${dirHandle.name}"`, 'success');
+            if (errors > 0) toast(`⚠ ${errors} archivo${errors > 1 ? 's' : ''} con error`, 'error');
+        }
+
+        function sanitizeFilename(name) {
+            return name.replace(/[\\/:*?"<>|]/g, '_');
+        }
+
+        // ─── TOAST ───────────────────────────────────────────
+        function toast(msg, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const el = document.createElement('div');
+            el.className = `toast ${type}`;
+            el.textContent = msg;
+            container.appendChild(el);
+            setTimeout(() => el.remove(), 3500);
+        }
+
+        // ─── UTILS ───────────────────────────────────────────
+        function esc(str) {
+            return String(str).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        // ─── KEYBOARD SHORTCUTS ───────────────────────────────
+        document.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                generateFiles();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === '+') {
+                e.preventDefault();
+                addLabel();
+            }
+        });
+    </script>
+</body>
+
+</html>
